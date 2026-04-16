@@ -1,0 +1,232 @@
+@page "/attendance/{eventid:guid}"
+
+@using EaseEventApp.Models
+@using EaseEventApp.Services
+
+<PageTitle>Event Attendance Tracker</PageTitle>
+
+<div class="container mt-5">
+    @if (CurrentEvent != null)
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">@CurrentEvent.EventName - Attendance Tracker</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Date:</strong> @CurrentEvent.EventDate.ToShortDateString()</p>
+                        <p><strong>Location:</strong> @CurrentEvent.Location</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <p><strong>Total Registered:</strong> @Stats.Total</p>
+                            <p><strong>Present:</strong> @Stats.Present</p>
+                            <p><strong>Absent:</strong> @Stats.Absent</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Register New Attendee -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Register New Attendee</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="NewAttendee" OnValidSubmit="HandleRegisterAttendee">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label for="attendeeName" class="form-label">Attendee Name:</label>
+                            <InputText id="attendeeName" @bind-Value="NewAttendee.AttendeeName" class="form-control" />
+                            <ValidationMessage For="() => NewAttendee.AttendeeName" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label for="email" class="form-label">Email:</label>
+                            <InputText id="email" @bind-Value="NewAttendee.Email" class="form-control" type="email" />
+                            <ValidationMessage For="() => NewAttendee.Email" />
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success">Register Attendee</button>
+                </EditForm>
+
+                @if (!string.IsNullOrEmpty(SuccessMessage))
+                {
+                    <div class="alert alert-success mt-2">@SuccessMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="alert alert-danger mt-2">@ErrorMessage</div>
+                }
+            </div>
+        </div>
+
+        <!-- Attendance List -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Attendance Record</h5>
+            </div>
+            <div class="card-body">
+                @if (Attendees.Count == 0)
+                {
+                    <p class="text-muted">No attendees registered for this event yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Attendee Name</th>
+                                    <th>Email</th>
+                                    <th>Registration Date</th>
+                                    <th>Status</th>
+                                    <th>Check-In Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var attendee in Attendees)
+                                {
+                                    <tr>
+                                        <td>@attendee.AttendeeName</td>
+                                        <td>@attendee.Email</td>
+                                        <td>@attendee.RegistrationDate.ToShortDateString()</td>
+                                        <td>
+                                            @if (attendee.IsPresent)
+                                            {
+                                                <span class="badge bg-success">Present</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">Absent</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (attendee.CheckInTime.HasValue)
+                                            {
+                                                @attendee.CheckInTime.Value.ToShortTimeString()
+                                            }
+                                            else
+                                            {
+                                                <em class="text-muted">Not checked in</em>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (attendee.IsPresent)
+                                            {
+                                                <button class="btn btn-sm btn-warning" @onclick="() => HandleCheckOut(attendee.ID)">Check Out</button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-primary" @onclick="() => HandleCheckIn(attendee.ID)">Check In</button>
+                                            }
+                                            <button class="btn btn-sm btn-danger" @onclick="() => HandleRemoveAttendee(attendee.ID)">Remove</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <button class="btn btn-secondary mt-3" @onclick="NavigateToHome">Back to Events</button>
+    }
+    else
+    {
+        <div class="alert alert-danger">Event not found.</div>
+        <button class="btn btn-secondary" @onclick="NavigateToHome">Back to Events</button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid EventID { get; set; }
+
+    [Inject]
+    private IEventService EventService { get; set; } = default!;
+
+    [Inject]
+    private IAttendanceService AttendanceService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private EventInfo? CurrentEvent;
+    private List<Attendance> Attendees = new();
+    private Attendance NewAttendee = new();
+    private string SuccessMessage = string.Empty;
+    private string ErrorMessage = string.Empty;
+    private (int Total, int Present, int Absent) Stats;
+
+    protected override void OnInitialized()
+    {
+        CurrentEvent = EventService.Events.FirstOrDefault(e => e.ID == EventID);
+        if (CurrentEvent != null)
+        {
+            LoadAttendees();
+        }
+    }
+
+    private void LoadAttendees()
+    {
+        Attendees = AttendanceService.GetEventAttendees(EventID);
+        Stats = AttendanceService.GetAttendanceStats(EventID);
+    }
+
+    private void HandleRegisterAttendee()
+    {
+        try
+        {
+            var attendee = new Attendance
+            {
+                EventID = EventID,
+                AttendeeName = NewAttendee.AttendeeName,
+                Email = NewAttendee.Email
+            };
+
+            AttendanceService.RegisterAttendee(EventID, attendee);
+            SuccessMessage = $"Successfully registered {NewAttendee.AttendeeName}!";
+            ErrorMessage = string.Empty;
+
+            LoadAttendees();
+            NewAttendee = new Attendance();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            SuccessMessage = string.Empty;
+        }
+    }
+
+    private void HandleCheckIn(Guid attendanceID)
+    {
+        AttendanceService.CheckInAttendee(EventID, attendanceID);
+        LoadAttendees();
+    }
+
+    private void HandleCheckOut(Guid attendanceID)
+    {
+        AttendanceService.CheckOutAttendee(EventID, attendanceID);
+        LoadAttendees();
+    }
+
+    private void HandleRemoveAttendee(Guid attendanceID)
+    {
+        AttendanceService.RemoveAttendee(EventID, attendanceID);
+        LoadAttendees();
+        SuccessMessage = "Attendee removed successfully!";
+    }
+
+    private void NavigateToHome()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+}

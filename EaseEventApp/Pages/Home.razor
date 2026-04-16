@@ -1,0 +1,62 @@
+﻿@page "/"
+@using EaseEventApp.Services
+
+<PageTitle>EventEase App</PageTitle>
+
+<h1>Welcome to EventEase App</h1>
+
+<h3>Event List</h3>
+
+@foreach (var eventInfo in Events)
+{
+    var stats = AttendanceService.GetAttendanceStats(eventInfo.ID);
+    <div class="card mb-3" @key="eventInfo.ID">
+        <div class="card-body">
+            <h5 class="card-title">@eventInfo.EventName</h5>
+            <p class="card-text">Date: @eventInfo.EventDate.ToShortDateString()</p>
+            <p class="card-text">Location: @eventInfo.Location</p>
+            <div class="alert alert-light d-inline-block" role="alert">
+                <small>
+                    <strong>Attendance:</strong> 
+                    Present: <span class="badge bg-success">@stats.Present</span>
+                    Absent: <span class="badge bg-warning">@stats.Absent</span>
+                    Total: <span class="badge bg-info">@stats.Total</span>
+                </small>
+            </div>
+            <div class="mt-2">
+                <a class="btn btn-outline-secondary" href="@GetEventDetailUrl(eventInfo.ID)">View Details</a>
+                <a class="btn btn-primary" href="@GetAttendanceTrackerUrl(eventInfo.ID)">Attendance Tracker</a>
+            </div>
+        </div>
+    </div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="NavigateToNewEvent">Register New Event</button>
+
+@code {
+    [Inject]
+    private IEventService EventService { get; set; } = default!;
+
+    [Inject]
+    private IAttendanceService AttendanceService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private List<EventInfo> Events => EventService.Events;
+
+    private void NavigateToNewEvent()
+    {
+        NavigationManager.NavigateTo("/eventcard");
+    }
+
+    private string GetEventDetailUrl(Guid id)
+    {
+        return $"/eventcard/{id}";
+    }
+
+    private string GetAttendanceTrackerUrl(Guid id)
+    {
+        return $"/attendance/{id}";
+    }
+}

@@ -1,0 +1,103 @@
+@page "/eventcard"
+@page "/eventcard/{id:guid}"
+
+<PageTitle>@(IsEditMode ? "Edit Event" : "Add Event")</PageTitle>
+
+<h3>@(IsEditMode ? "Edit Event" : "Add Event")</h3>
+
+<EditForm Model="WorkingEvent" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group mb-2">
+        <label for="eventName">Event Name:</label>
+        <InputText id="eventName" @bind-Value="WorkingEvent.EventName" class="form-control" />
+        <ValidationMessage For="() => WorkingEvent.EventName" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label for="eventDate">Event Date:</label>
+        <InputDate id="eventDate" @bind-Value="WorkingEvent.EventDate" class="form-control" />
+        <ValidationMessage For="() => WorkingEvent.EventDate" />
+    </div>
+
+    <div class="form-group mb-2">
+        <label for="location">Location:</label>
+        <InputText id="location" @bind-Value="WorkingEvent.Location" class="form-control" />
+        <ValidationMessage For="() => WorkingEvent.Location" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">@(IsEditMode ? "Update Event" : "Add Event")</button>
+    <button type="button" class="btn btn-secondary ms-2" @onclick="NavigateToHome">Cancel</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    [Inject]
+    private IEventService EventService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    private EventInfo WorkingEvent { get; set; } = new EventInfo();
+    private EventInfo? FoundEvent { get; set; }
+
+    private bool IsEditMode => Id.HasValue;
+
+    protected override void OnParametersSet()
+    {
+        if (IsEditMode && Id.HasValue)
+        {
+            FoundEvent = EventService.GetEventById(Id.Value);
+
+            if (FoundEvent != null)
+            {
+                WorkingEvent = new EventInfo
+                {
+                    EventName = FoundEvent.EventName,
+                    EventDate = FoundEvent.EventDate,
+                    Location = FoundEvent.Location
+                };
+            }
+            else
+            {
+                // Invalid id, redirect to not found
+                NavigationManager.NavigateTo("/404");
+                return;
+            }
+        }
+        else
+        {
+            FoundEvent = null;
+            WorkingEvent = new EventInfo();
+        }
+    }
+
+    private void HandleValidSubmit()
+    {
+        if (IsEditMode && FoundEvent != null)
+        {
+            FoundEvent.EventName = WorkingEvent.EventName;
+            FoundEvent.EventDate = WorkingEvent.EventDate;
+            FoundEvent.Location = WorkingEvent.Location;
+        }
+        else
+        {
+            EventService.Events.Add(new EventInfo
+            {
+                EventName = WorkingEvent.EventName,
+                EventDate = WorkingEvent.EventDate,
+                Location = WorkingEvent.Location
+            });
+        }
+
+        NavigateToHome();
+    }
+
+    private void NavigateToHome()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+}

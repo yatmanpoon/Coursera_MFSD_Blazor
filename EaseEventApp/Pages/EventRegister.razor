@@ -1,0 +1,11 @@
+@page "/eventregister"
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.NavigateTo("/eventcard");
+    }
+}

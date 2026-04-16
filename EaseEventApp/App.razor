@@ -1,0 +1,22 @@
+﻿<ErrorBoundary>
+    <ChildContent>
+        <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+        </Router>
+    </ChildContent>
+    <ErrorContent Context="ex">
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">An error occurred</h4>
+            <p>The application encountered an unexpected error. Please try refreshing the page or contact support if the problem persists.</p>
+            @if (System.Diagnostics.Debugger.IsAttached)
+            {
+                <hr>
+                <p class="mb-0"><strong>Debug Info:</strong> @ex.Message</p>
+                <pre class="mt-2">@ex.StackTrace</pre>
+            }
+        </div>
+    </ErrorContent>
+</ErrorBoundary>
